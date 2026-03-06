@@ -1,4 +1,4 @@
-const CACHE_NAME = "karuta-v6";
+const CACHE_NAME = "karuta-v7";
 const ASSETS = [
   "./",
   "./index.html",

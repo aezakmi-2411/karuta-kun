@@ -19,7 +19,7 @@ except ModuleNotFoundError as exc:
 
 DEFAULT_DATA_FILE = Path("karuta-data.json")
 DEFAULT_AUDIO_DIR = Path("audio")
-DEFAULT_VOICE = "ja-JP-NanamiNeural"
+DEFAULT_VOICE = "ja-JP-KeitaNeural"
 
 
 ROMAJI_FALLBACK = {
