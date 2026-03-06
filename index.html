@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#4db8ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>カルタくん</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <style>
+      :root {
+        --sky-top:      #c9e8fd;
+        --sky-bottom:   #89c4f4;
+        --blue:         #4db8ff;
+        --blue-strong:  #2196f3;
+        --blue-glow:    rgba(33,150,243,0.3);
+        --green:        #5fd4a0;
+        --green-strong: #3cb47a;
+        --coral:        #ff6b6b;
+        --coral-strong: #e04545;
+        --yellow:       #ffe066;
+        --orange:       #ffb347;
+        --purple:       #b39ddb;
+        --card-bg:      rgba(255,255,255,0.88);
+        --text:         #2c3e50;
+        --text-light:   #5a7d9a;
+        --error:        #d64545;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+      html, body {
+        height: 100%; height: 100dvh;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: "Kosugi Maru", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+        background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 100%);
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      /* ── animated clouds ── */
+      .cloud {
+        position: fixed;
+        background: rgba(255,255,255,0.7);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        will-change: transform;
+      }
+
+      /* ── confetti canvas ── */
+      #confetti {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        pointer-events: none;
+      }
+
+      /* ── app card ── */
+      .app {
+        position: relative;
+        z-index: 1;
+        width: min(94vw, 520px);
+        max-height: 96vh; max-height: 96dvh;
+        padding: 28px 20px 28px;
+        border-radius: 32px;
+        background: var(--card-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow:
+          0 12px 48px rgba(33,150,243,0.18),
+          0 2px 8px rgba(0,0,0,0.06),
+          inset 0 1px 0 rgba(255,255,255,0.6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        animation: card-enter 0.6s cubic-bezier(.34,1.56,.64,1) both;
+      }
+
+      @keyframes card-enter {
+        from { opacity: 0; transform: translateY(30px) scale(0.95); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      /* ── title ── */
+      .title {
+        font-size: 44px;
+        font-weight: 700;
+        text-align: center;
+        color: var(--blue-strong);
+        text-shadow: 2px 3px 0 var(--yellow);
+        line-height: 1.2;
+      }
+      .title-accent {
+        display: inline-block;
+        animation: title-bounce 2s ease-in-out infinite;
+      }
+      @keyframes title-bounce {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        25% { transform: translateY(-3px) rotate(-2deg); }
+        75% { transform: translateY(-3px) rotate(2deg); }
+      }
+
+      /* ── progress bar ── */
+      .progress-wrap {
+        width: 100%;
+        max-width: 340px;
+        display: none;
+        align-items: center;
+        gap: 10px;
+      }
+      .progress-wrap.visible { display: flex; }
+
+      .progress-track {
+        flex: 1;
+        height: 14px;
+        background: rgba(0,0,0,0.07);
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+      }
+      .progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--blue), var(--green));
+        transition: width 0.5s cubic-bezier(.34,1.56,.64,1);
+        position: relative;
+      }
+      .progress-fill::after {
+        content: "";
+        position: absolute;
+        inset: 2px 4px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.35);
+      }
+      .progress-text {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--blue-strong);
+        min-width: 56px;
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      /* ── soundwave visualizer ── */
+      .soundwave {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        height: 56px;
+      }
+      .soundwave.visible { display: flex; }
+      .soundwave .soundwave-bar {
+        transition: transform 0.3s ease;
+        transform: scaleY(0.15);
+      }
+      .soundwave.active .soundwave-bar {
+        animation: wave 1s ease-in-out infinite;
+      }
+      .soundwave-bar {
+        width: 6px;
+        border-radius: 999px;
+        background: var(--blue);
+        transform-origin: center;
+      }
+      .soundwave-bar:nth-child(1)  { height: 12px; animation-delay: 0s; }
+      .soundwave-bar:nth-child(2)  { height: 20px; animation-delay: 0.1s; }
+      .soundwave-bar:nth-child(3)  { height: 32px; animation-delay: 0.15s; }
+      .soundwave-bar:nth-child(4)  { height: 40px; animation-delay: 0.2s; }
+      .soundwave-bar:nth-child(5)  { height: 48px; animation-delay: 0.25s; background: var(--blue-strong); }
+      .soundwave-bar:nth-child(6)  { height: 40px; animation-delay: 0.2s; }
+      .soundwave-bar:nth-child(7)  { height: 32px; animation-delay: 0.15s; }
+      .soundwave-bar:nth-child(8)  { height: 20px; animation-delay: 0.1s; }
+      .soundwave-bar:nth-child(9)  { height: 12px; animation-delay: 0s; }
+      @keyframes wave {
+        0%, 100% { transform: scaleY(0.4); }
+        50%      { transform: scaleY(1); }
+      }
+
+      /* ── version badge (wooden arrow) ── */
+      .version {
+        position: absolute;
+        top: 14px;
+        right: -6px;
+        background: linear-gradient(180deg, #d4a66a 0%, #b8864e 100%);
+        color: #fff;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 3px 14px 3px 12px;
+        border-radius: 4px 0 0 4px;
+        box-shadow:
+          0 2px 4px rgba(0,0,0,0.15),
+          inset 0 1px 0 rgba(255,255,255,0.25);
+        letter-spacing: 1px;
+        text-transform: none;
+        z-index: 2;
+      }
+      .version::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: -6px;
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 6px 6px 0 0;
+        border-color: #8a6535 transparent transparent transparent;
+      }
+
+      /* ── buttons ── */
+      .controls {
+        width: 100%;
+        max-width: 380px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 22px;
+        font-family: inherit;
+        font-size: 24px;
+        font-weight: 700;
+        padding: 0 24px;
+        height: 66px;
+        color: white;
+        cursor: pointer;
+        overflow: hidden;
+        transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s;
+        box-shadow:
+          0 6px 16px rgba(0,0,0,0.12),
+          inset 0 2px 0 rgba(255,255,255,0.25),
+          inset 0 -2px 0 rgba(0,0,0,0.08);
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      .btn:active {
+        transform: scale(0.94);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 2px 0 rgba(255,255,255,0.15);
+        transition-duration: 0.08s;
+      }
+
+      .btn-blue   { background: linear-gradient(180deg, var(--blue) 0%, var(--blue-strong) 100%); }
+      .btn-green  { background: linear-gradient(180deg, var(--green) 0%, var(--green-strong) 100%); }
+      .btn-coral  { background: linear-gradient(180deg, var(--coral) 0%, var(--coral-strong) 100%); }
+
+      .btn-small {
+        height: 50px;
+        font-size: 20px;
+        border-radius: 16px;
+        width: 50%;
+        align-self: center;
+        margin-top: 8px;
+        box-shadow:
+          0 4px 10px rgba(0,0,0,0.10),
+          inset 0 1px 0 rgba(255,255,255,0.2),
+          inset 0 -1px 0 rgba(0,0,0,0.08);
+      }
+
+      /* ripple */
+      .btn .ripple {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.35);
+        transform: scale(0);
+        animation: ripple-anim 0.5s ease-out forwards;
+        pointer-events: none;
+      }
+      @keyframes ripple-anim {
+        to { transform: scale(3); opacity: 0; }
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      /* row layout for repeat + next */
+      .btn-row {
+        display: flex;
+        gap: 12px;
+      }
+      .btn-row .btn { flex: 1; }
+
+      .hidden { display: none !important; }
+
+      /* ── message ── */
+      .message {
+        text-align: center;
+        font-size: 16px;
+        min-height: 0;
+        color: var(--text-light);
+        transition: opacity 0.3s;
+      }
+      .message:empty { display: none; }
+      .error { color: var(--error); font-weight: 700; }
+
+      /* ── game over screen ── */
+      .game-over-text {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--blue-strong);
+        text-shadow: 2px 2px 0 var(--yellow);
+        animation: tada 0.8s cubic-bezier(.34,1.56,.64,1) both;
+        text-align: center;
+        line-height: 1.4;
+      }
+      @keyframes tada {
+        0%   { transform: scale(0.3) rotate(-5deg); opacity: 0; }
+        50%  { transform: scale(1.08) rotate(3deg); }
+        70%  { transform: scale(0.96) rotate(-2deg); }
+        100% { transform: scale(1) rotate(0); opacity: 1; }
+      }
+
+      /* ── landscape tweaks ── */
+      @media (min-width: 700px) {
+        .app { max-width: 560px; padding: 32px 28px 24px; }
+        .title { font-size: 48px; }
+        .btn { height: 72px; font-size: 26px; }
+      }
+
+      /* short screens */
+      @media (max-height: 600px) {
+        .app { gap: 10px; padding: 14px 16px; }
+        .btn { height: 54px; font-size: 20px; }
+        .btn-small { height: 40px; font-size: 16px; }
+        .title { font-size: 32px; }
+        .game-over-text { font-size: 26px; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="confetti"></canvas>
+
+    <div class="app" role="application" aria-label="カルタくん">
+      <div class="version">v0.1.0</div>
+
+      <!-- Title -->
+      <div class="title"><span class="title-accent">カルタくん</span></div>
+
+      <!-- Hero character display -->
+      <!-- Progress bar -->
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+        <div class="progress-text" id="progress-text">0 / 46</div>
+      </div>
+
+      <!-- Soundwave visualizer -->
+      <div class="soundwave" id="soundwave">
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+        <div class="soundwave-bar"></div>
+      </div>
+      <!-- Buttons -->
+      <div class="controls" id="controls">
+        <button class="btn btn-blue" id="start-btn">はじめる</button>
+        <div class="btn-row hidden" id="play-row">
+          <button class="btn btn-green" id="repeat-btn">もういちど</button>
+          <button class="btn btn-blue" id="next-btn">つぎへ</button>
+        </div>
+        <button class="btn btn-blue hidden" id="play-again-btn">もういっかい</button>
+        <button class="btn btn-coral btn-small hidden" id="end-btn">おしまい</button>
+      </div>
+
+      <p id="message" class="message"></p>
+    </div>
+
+    <script>
+      /* ═══ DATA ═══ */
+      var data = [
+        {"hiragana":"あ","romaji":"a","sentence":"あまいアイスクリームの「あ」"},
+        {"hiragana":"い","romaji":"i","sentence":"いたずらいっぱいイルカの「い」"},
+        {"hiragana":"う","romaji":"u","sentence":"うちゅうでうきうきの「う」"},
+        {"hiragana":"え","romaji":"e","sentence":"えのぐでえをかくの「え」"},
+        {"hiragana":"お","romaji":"o","sentence":"おしょうがつのおせちりょうりの「お」"},
+        {"hiragana":"か","romaji":"ka","sentence":"かわいいかめのかけっこの「か」"},
+        {"hiragana":"き","romaji":"ki","sentence":"きんメダルキラキラの「き」"},
+        {"hiragana":"く","romaji":"ku","sentence":"くものくつしたの「く」"},
+        {"hiragana":"け","romaji":"ke","sentence":"けらけらわらうケーキやさんの「け」"},
+        {"hiragana":"こ","romaji":"ko","sentence":"ことりのコンサートの「こ」"},
+        {"hiragana":"さ","romaji":"sa","sentence":"さむがりのサンタクロースの「さ」"},
+        {"hiragana":"し","romaji":"shi","sentence":"シマウマのしっぽの「し」"},
+        {"hiragana":"す","romaji":"su","sentence":"すいすいすべるスケートの「す」"},
+        {"hiragana":"せ","romaji":"se","sentence":"せんせいとせくらべの「せ」"},
+        {"hiragana":"そ","romaji":"so","sentence":"そとでそうじの「そ」"},
+        {"hiragana":"た","romaji":"ta","sentence":"たのしいたからさがしの「た」"},
+        {"hiragana":"ち","romaji":"chi","sentence":"ちいさなちくわの「ち」"},
+        {"hiragana":"つ","romaji":"tsu","sentence":"つるつるつめたいつららの「つ」"},
+        {"hiragana":"て","romaji":"te","sentence":"てくてくてんとうむしの「て」"},
+        {"hiragana":"と","romaji":"to","sentence":"とびはねるトランポリンの「と」"},
+        {"hiragana":"な","romaji":"na","sentence":"ながいなわとびの「な」"},
+        {"hiragana":"に","romaji":"ni","sentence":"にんじんにほんの「に」"},
+        {"hiragana":"ぬ","romaji":"nu","sentence":"ぬくぬくぬいぐるみの「ぬ」"},
+        {"hiragana":"ね","romaji":"ne","sentence":"ねむいねこのねごとの「ね」"},
+        {"hiragana":"の","romaji":"no","sentence":"のびのびのはらの「の」"},
+        {"hiragana":"は","romaji":"ha","sentence":"はなばたけのはちみつの「は」"},
+        {"hiragana":"ひ","romaji":"hi","sentence":"ひらひらひまわりの「ひ」"},
+        {"hiragana":"ふ","romaji":"fu","sentence":"ふかふかのふとんの「ふ」"},
+        {"hiragana":"へ","romaji":"he","sentence":"へとへとのへびの「へ」"},
+        {"hiragana":"ほ","romaji":"ho","sentence":"ほしのほうせきの「ほ」"},
+        {"hiragana":"ま","romaji":"ma","sentence":"まっかなまんとの「ま」"},
+        {"hiragana":"み","romaji":"mi","sentence":"みどりのみかんみっけの「み」"},
+        {"hiragana":"む","romaji":"mu","sentence":"むにむにむらさきぶどうの「む」"},
+        {"hiragana":"め","romaji":"me","sentence":"めいろのめいじんの「め」"},
+        {"hiragana":"も","romaji":"mo","sentence":"もりでもぐらがもぐもぐの「も」"},
+        {"hiragana":"や","romaji":"ya","sentence":"やさいやまもりの「や」"},
+        {"hiragana":"ゆ","romaji":"yu","sentence":"ゆらゆらゆれるゆきだるまの「ゆ」"},
+        {"hiragana":"よ","romaji":"yo","sentence":"よちよちよるのおさんぽの「よ」"},
+        {"hiragana":"ら","romaji":"ra","sentence":"ラッパをならすラッコの「ら」"},
+        {"hiragana":"り","romaji":"ri","sentence":"リスのリュックサックの「り」"},
+        {"hiragana":"る","romaji":"ru","sentence":"るすばんでんわるるるるの「る」"},
+        {"hiragana":"れ","romaji":"re","sentence":"れいぞうこのれたすの「れ」"},
+        {"hiragana":"ろ","romaji":"ro","sentence":"ろくろをまわすロボットの「ろ」"},
+        {"hiragana":"わ","romaji":"wa","sentence":"わにがわらうの「わ」"},
+        {"hiragana":"を","romaji":"wo","sentence":"をはプレゼントをもらうの「を」"},
+        {"hiragana":"ん","romaji":"n","sentence":"んはがんたんの「ん」"}
+      ];
+
+      /* ═══ DOM ═══ */
+      var startBtn     = document.getElementById("start-btn");
+      var nextBtn      = document.getElementById("next-btn");
+      var repeatBtn    = document.getElementById("repeat-btn");
+      var endBtn       = document.getElementById("end-btn");
+      var playAgainBtn = document.getElementById("play-again-btn");
+      var playRow      = document.getElementById("play-row");
+      var soundwaveEl  = document.getElementById("soundwave");
+      var messageEl    = document.getElementById("message");
+      var progressWrap = document.getElementById("progress-wrap");
+      var progressFill = document.getElementById("progress-fill");
+      var progressText = document.getElementById("progress-text");
+      var confettiCanvas = document.getElementById("confetti");
+
+      /* ═══ CLOUDS ═══ */
+      (function createClouds() {
+        var configs = [
+          { w: 180, h: 60, top: '6%',  left: '-20px',  dur: 20, blobs: [[60,-20,14],[120,-8,22]] },
+          { w: 240, h: 75, top: '15%', right: '-30px', dur: 26, blobs: [[80,-25,18],[160,-12,28]] },
+          { w: 150, h: 50, top: '78%', left: '10%',    dur: 22, blobs: [[50,-16,12],[100,-6,18]] },
+          { w: 200, h: 65, top: '85%', right: '5%',    dur: 30, blobs: [[70,-22,16],[140,-10,24]] },
+          { w: 120, h: 40, top: '45%', left: '-40px',  dur: 24, blobs: [[40,-12,10],[80,-5,15]] },
+        ];
+        configs.forEach(function(c, i) {
+          var el = document.createElement('div');
+          el.className = 'cloud';
+          el.style.width = c.w + 'px';
+          el.style.height = c.h + 'px';
+          if (c.top)   el.style.top = c.top;
+          if (c.left)  el.style.left = c.left;
+          if (c.right) el.style.right = c.right;
+          el.style.boxShadow = c.blobs.map(function(b) {
+            return b[0] + 'px ' + b[1] + 'px 0 ' + b[2] + 'px rgba(255,255,255,0.5)';
+          }).join(',');
+          el.style.animation = 'cloud-drift ' + c.dur + 's ease-in-out infinite alternate';
+          el.style.animationDelay = -(i * 4) + 's';
+          document.body.appendChild(el);
+        });
+        var style = document.createElement('style');
+        style.textContent = '@keyframes cloud-drift { 0% { transform: translateX(0); } 100% { transform: translateX(50px); } }';
+        document.head.appendChild(style);
+      })();
+
+      /* ═══ RIPPLE ═══ */
+      document.querySelectorAll('.btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          var rect = btn.getBoundingClientRect();
+          var ripple = document.createElement('span');
+          ripple.className = 'ripple';
+          var size = Math.max(rect.width, rect.height);
+          ripple.style.width = ripple.style.height = size + 'px';
+          ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+          ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+          btn.appendChild(ripple);
+          ripple.addEventListener('animationend', function() { ripple.remove(); });
+        });
+      });
+
+      /* ═══ CONFETTI ═══ */
+      var confettiCtx = confettiCanvas.getContext('2d');
+      var confettiPieces = [];
+      var confettiRunning = false;
+
+      function resizeConfetti() {
+        confettiCanvas.width = window.innerWidth;
+        confettiCanvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resizeConfetti);
+      resizeConfetti();
+
+      function launchConfetti() {
+        confettiPieces = [];
+        var colors = ['#4db8ff','#ffe066','#ff6b6b','#5fd4a0','#ffb347','#b39ddb','#ff9ff3'];
+        for (var i = 0; i < 120; i++) {
+          confettiPieces.push({
+            x: Math.random() * confettiCanvas.width,
+            y: -20 - Math.random() * 200,
+            w: 6 + Math.random() * 8,
+            h: 4 + Math.random() * 6,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            vx: (Math.random() - 0.5) * 4,
+            vy: 2 + Math.random() * 4,
+            rot: Math.random() * 360,
+            rv: (Math.random() - 0.5) * 12,
+            opacity: 1,
+          });
+        }
+        confettiRunning = true;
+        requestAnimationFrame(animateConfetti);
+      }
+
+      function animateConfetti() {
+        if (!confettiRunning) return;
+        confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        var alive = 0;
+        confettiPieces.forEach(function(p) {
+          if (p.opacity <= 0) return;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.08;
+          p.rot += p.rv;
+          if (p.y > confettiCanvas.height + 20) { p.opacity = 0; return; }
+          if (p.y > confettiCanvas.height * 0.7) p.opacity -= 0.015;
+          alive++;
+          confettiCtx.save();
+          confettiCtx.translate(p.x, p.y);
+          confettiCtx.rotate(p.rot * Math.PI / 180);
+          confettiCtx.globalAlpha = Math.max(0, p.opacity);
+          confettiCtx.fillStyle = p.color;
+          confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          confettiCtx.restore();
+        });
+        if (alive > 0) {
+          requestAnimationFrame(animateConfetti);
+        } else {
+          confettiRunning = false;
+          confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        }
+      }
+
+      /* ═══ GAME STATE ═══ */
+      var totalCards = data.length;
+      var minDelayMs = 300;
+      var maxDelayMs = 800;
+      var actionDebounceMs = 300;
+
+      var deck = [];
+      var currentIndex = -1;
+      var currentPhase = "idle";
+      var preReadTimer = null;
+      var activeAudio = null;
+      var interactionLockUntil = 0;
+      var audioCache = {};
+      var wakeLock = null;
+
+      function setMessage(text, isError) {
+        messageEl.textContent = text || "";
+        messageEl.classList.toggle("error", Boolean(isError));
+      }
+
+      function shuffle(list) {
+        var result = list.slice();
+        for (var i = result.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var tmp = result[i];
+          result[i] = result[j];
+          result[j] = tmp;
+        }
+        return result;
+      }
+
+      function setProgress(current, total) {
+        var pct = total > 0 ? (current / total) * 100 : 0;
+        progressFill.style.width = pct + '%';
+        progressText.textContent = current + ' / ' + total;
+      }
+
+      function updateUi() {
+        var isPlaying = currentPhase === "pre" || currentPhase === "reading" || currentPhase === "waiting";
+        var isOver = currentPhase === "gameOver";
+
+        if (isOver) {
+          soundwaveEl.classList.remove("visible", "active");
+          startBtn.classList.add("hidden");
+          playRow.classList.add("hidden");
+          endBtn.classList.add("hidden");
+          playAgainBtn.classList.remove("hidden");
+          setProgress(totalCards, totalCards);
+          // create overlay text
+          if (!document.getElementById('game-over-overlay')) {
+            var ov = document.createElement('div');
+            ov.id = 'game-over-overlay';
+            ov.innerHTML = '<div class="game-over-text">おしまい！よくがんばったね！</div>';
+            soundwaveEl.parentNode.insertBefore(ov, soundwaveEl.nextSibling);
+          }
+          launchConfetti();
+          return;
+        }
+
+        // remove game-over overlay if it exists
+        var ov = document.getElementById('game-over-overlay');
+        if (ov) { ov.remove(); }
+
+        startBtn.classList.toggle("hidden", currentPhase !== "idle");
+        playAgainBtn.classList.add("hidden");
+        playRow.classList.toggle("hidden", !isPlaying);
+        repeatBtn.disabled = (currentPhase === "pre");
+        endBtn.classList.toggle("hidden", !isPlaying);
+
+        progressWrap.classList.toggle("visible", currentPhase !== "idle");
+      }
+
+      function renderPhase() {
+        if (currentPhase === "idle") {
+          soundwaveEl.classList.remove("visible", "active");
+          setProgress(0, totalCards);
+          return;
+        }
+
+        if (currentPhase === "gameOver") return;
+
+        soundwaveEl.classList.add("visible");
+        if (currentPhase === "reading") {
+          soundwaveEl.classList.add("active");
+        } else {
+          soundwaveEl.classList.remove("active");
+        }
+
+        var readableCount = Math.min(currentIndex + 1, totalCards);
+        setProgress(readableCount, totalCards);
+      }
+
+      function stopActiveAudio() {
+        if (!activeAudio) return;
+        activeAudio.pause();
+        activeAudio.currentTime = 0;
+      }
+
+      function clearTimers() {
+        if (preReadTimer) {
+          clearTimeout(preReadTimer);
+          preReadTimer = null;
+        }
+      }
+
+      function preloadAudio() {
+        data.forEach(function (card) {
+          if (!audioCache[card.romaji]) {
+            var a = new Audio("audio/" + card.romaji + ".mp3");
+            a.preload = "auto";
+            a.load();
+            a.addEventListener("ended", function () {
+              if (activeAudio !== a) return;
+              onAudioEnded();
+            });
+            audioCache[card.romaji] = a;
+          }
+        });
+      }
+
+      function onAudioEnded() {
+        if (currentPhase !== "reading") return;
+        currentPhase = "waiting";
+        renderPhase();
+        updateUi();
+      }
+
+      function playCurrentCard() {
+        var current = deck[currentIndex];
+        currentPhase = "reading";
+        setMessage("");
+        renderPhase();
+        updateUi();
+
+        stopActiveAudio();
+        activeAudio = audioCache[current.romaji];
+        if (!activeAudio) {
+          setMessage("おんせいファイルがみつかりません: " + current.romaji + ".mp3", true);
+          return;
+        }
+
+        activeAudio.currentTime = 0;
+        activeAudio.play().catch(function () {
+          setMessage("おんせいをさいせいできませんでした。もういちどボタンをおしてください", true);
+        });
+      }
+
+      function startPreRead() {
+        clearTimers();
+        stopActiveAudio();
+        currentPhase = "pre";
+        renderPhase();
+        updateUi();
+
+        var waitMs = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
+        preReadTimer = setTimeout(function () {
+          preReadTimer = null;
+          playCurrentCard();
+        }, waitMs);
+      }
+
+      function advanceToNextCard() {
+        clearTimers();
+        stopActiveAudio();
+        currentIndex += 1;
+        if (currentIndex >= totalCards) {
+          currentPhase = "gameOver";
+          renderPhase();
+          updateUi();
+          setMessage("");
+          releaseWakeLock();
+          return;
+        }
+        startPreRead();
+      }
+
+      function requestUnlock() {
+        var now = Date.now();
+        if (now < interactionLockUntil) return false;
+        interactionLockUntil = now + actionDebounceMs;
+        return true;
+      }
+
+      /* Wake Lock */
+      async function acquireWakeLock() {
+        if (!("wakeLock" in navigator)) return;
+        try {
+          wakeLock = await navigator.wakeLock.request("screen");
+          wakeLock.addEventListener("release", function () { wakeLock = null; });
+        } catch (_) {}
+      }
+
+      function releaseWakeLock() {
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+      }
+
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible" && currentPhase !== "idle" && currentPhase !== "gameOver") {
+          acquireWakeLock();
+        }
+      });
+
+      function onStart() {
+        if (!requestUnlock()) return;
+        confettiRunning = false;
+        stopActiveAudio();
+        clearTimers();
+        deck = shuffle(data);
+        currentIndex = -1;
+        currentPhase = "idle";
+        setMessage("");
+        preloadAudio();
+        acquireWakeLock();
+        advanceToNextCard();
+      }
+
+      function onNext() {
+        if (!requestUnlock()) return;
+        if (currentPhase === "idle" || currentPhase === "gameOver") return;
+        advanceToNextCard();
+      }
+
+      function onRepeat() {
+        if (!requestUnlock()) return;
+        if (currentPhase !== "reading" && currentPhase !== "waiting") return;
+        if (!activeAudio) return;
+        clearTimers();
+        stopActiveAudio();
+        activeAudio.currentTime = 0;
+        currentPhase = "reading";
+        renderPhase();
+        updateUi();
+        activeAudio.play().catch(function () {
+          setMessage("さいせいをかいしできませんでした。もういちどおしてください", true);
+        });
+      }
+
+      function onEnd() {
+        if (!requestUnlock()) return;
+        if (currentPhase === "idle" || currentPhase === "gameOver") return;
+        clearTimers();
+        stopActiveAudio();
+        currentPhase = "gameOver";
+        renderPhase();
+        updateUi();
+        setMessage("");
+        releaseWakeLock();
+      }
+
+      function onPlayAgain() { onStart(); }
+
+      startBtn.addEventListener("click", onStart);
+      nextBtn.addEventListener("click", onNext);
+      repeatBtn.addEventListener("click", onRepeat);
+      endBtn.addEventListener("click", onEnd);
+      playAgainBtn.addEventListener("click", onPlayAgain);
+
+      window.addEventListener("beforeunload", function () {
+        clearTimers();
+        stopActiveAudio();
+        releaseWakeLock();
+      });
+
+      renderPhase();
+      updateUi();
+
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("./service-worker.js");
+        });
+      }
+    </script>
+  </body>
+</html>
